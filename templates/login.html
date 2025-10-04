@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Expense Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+    }
+
+    .auth-container {
+        width: 100%;
+        max-width: 450px;
+        padding: 0 1rem;
+    }
+
+    .auth-card {
+        background: var(--white);
+        border-radius: 16px;
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        padding: 3rem;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .auth-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--white);
+        font-size: 2.5rem;
+    }
+
+    .auth-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .auth-subtitle {
+        color: var(--gray);
+        font-size: 1rem;
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--gray-lighter);
+        color: var(--gray);
+    }
+
+    .auth-footer a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .navbar {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="48" height="48">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Welcome Back</h1>
+            <p class="auth-subtitle">Sign in to your account</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="john@company.com" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                Sign In
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
