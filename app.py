@@ -8,7 +8,7 @@ import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from passlib.hash import bcrypt
+import bcrypt 
 
 # -----------------------------
 # Config
@@ -63,11 +63,15 @@ class User(db.Model, UserMixin):
     company = db.relationship("Company", backref=db.backref("users", cascade="all, delete-orphan"), foreign_keys=[company_id])
     manager = db.relationship("User", remote_side=[id], backref="team")
 
-    def set_password(self, pw): 
-        self.password_hash = bcrypt.hash(pw)
-    
-    def check_password(self, pw): 
-        return bcrypt.verify(pw, self.password_hash)
+    def set_password(self, pw):
+        pw_trunc = pw[:72].encode('utf-8')
+        salt = bcrypt.gensalt()
+        self.password_hash = bcrypt.hashpw(pw_trunc, salt).decode('utf-8')
+
+    def check_password(self, pw):
+        pw_trunc = pw[:72].encode('utf-8')
+        return bcrypt.checkpw(pw_trunc, self.password_hash.encode('utf-8'))
+
 
     def __repr__(self):
         return f'<User {self.email}>'
@@ -136,6 +140,7 @@ class ApprovalStep(db.Model):
 
     def __repr__(self):
         return f'<ApprovalStep {self.id}: Expense {self.expense_id}, Step {self.sequence}>'
+
 
 # -----------------------------
 # Utilities

@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Expense Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">User Management</h1>
+        <div>
+            <a href="{{ url_for('seed') }}" class="btn btn-secondary" style="margin-right: 0.5rem;">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                Quick Seed
+            </a>
+            <button onclick="openUserModal()" class="btn btn-primary">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                Add User
+            </button>
+        </div>
+    </div>
+
+    <div class="stats-grid" style="margin-bottom: 2rem;">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <h3>{{ users|length }}</h3>
+                <p>Total Users</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <h3>{{ users|selectattr('role', 'equalto', 'employee')|list|length }}</h3>
+                <p>Employees</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <h3>{{ users|selectattr('role', 'equalto', 'manager')|list|length }}</h3>
+                <p>Managers</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon danger">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <h3>{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</h3>
+                <p>Admins</p>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <input type="text" id="searchBox" class="form-control" placeholder="🔍 Search by name, email, or role..." onkeyup="filterTable()">
+    </div>
+
+    <div class="table-container">
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Manager</th>
+                    <th>Manager Approver</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <strong>{{ user.name }}</strong>
+                        {% if user.id == current_user.id %}
+                        <span class="badge badge-info" style="margin-left: 0.5rem;">You</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        {% if user.role == 'admin' %}
+                        <span class="badge badge-danger">👑 Admin</span>
+                        {% elif user.role == 'manager' %}
+                        <span class="badge badge-warning">👔 Manager</span>
+                        {% else %}
+                        <span class="badge badge-secondary">👤 Employee</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.manager %}
+                        {{ user.manager.name }}
+                        {% else %}
+                        <span style="color: var(--gray);">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_manager_approver %}
+                        <span class="badge badge-success">✓ Yes</span>
+                        {% else %}
+                        <span class="badge badge-secondary">✗ No</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_active_user %}
+                        <span class="badge badge-success">Active</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small style="color: var(--gray);">{{ user.created_at.strftime('%Y-%m-%d') }}</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="userModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; animation: fadeIn 0.3s;">
+    <div style="background: white; border-radius: 16px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 0; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); padding: 2rem; border-radius: 16px 16px 0 0; color: white;">
+            <button onclick="closeUserModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(255,255,255,0.2); border: none; font-size: 1.5rem; cursor: pointer; color: white; width: 40px; height: 40px; border-radius: 50%;">×</button>
+            <h2 style="margin: 0; font-size: 1.75rem;">Add New User</h2>
+        </div>
+        
+        <form method="POST" action="{{ url_for('admin_users') }}" style="padding: 2rem;">
+            <div class="form-group">
+                <label class="form-label" for="name">Full Name *</label>
+                <input type="text" id="name" name="name" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="email">Email Address *</label>
+                <input type="email" id="email" name="email" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password *</label>
+                <input type="password" id="password" name="password" class="form-control" minlength="6" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="role">Role *</label>
+                    <select id="role" name="role" class="form-control" required>
+                        <option value="employee">Employee</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="manager_id">Manager</label>
+                    <select id="manager_id" name="manager_id" class="form-control">
+                        <option value="">None</option>
+                        {% for user in users %}
+                            {% if user.role in ['manager', 'admin'] %}
+                            <option value="{{ user.id }}">{{ user.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="is_manager_approver" name="is_manager_approver" checked>
+                    <label for="is_manager_approver">Require manager approval first</label>
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="button" onclick="closeUserModal()" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>
+
+<script>
+    function filterTable() {
+        const input = document.getElementById('searchBox');
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById('usersTable');
+        const rows = table.getElementsByTagName('tr');
+
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName('td');
+            let found = false;
+            
+            for (let j = 0; j < cells.length; j++) {
+                if (cells[j].textContent.toLowerCase().indexOf(filter) > -1) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            rows[i].style.display = found ? '' : 'none';
+        }
+    }
+
+    function openUserModal() {
+        document.getElementById('userModal').style.display = 'flex';
+    }
+
+    function closeUserModal() {
+        document.getElementById('userModal').style.display = 'none';
+    }
+
+    // Close modal on outside click
+    document.getElementById('userModal').addEventListener('click', function(e) {
+        if (e.target === this) closeUserModal();
+    });
+
+    // ESC key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('userModal').style.display === 'flex') {
+            closeUserModal();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block title %}Approval Rules - Expense Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">Approval Rules</h1>
+        <button onclick="openRuleModal()" class="btn btn-primary">
+            <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
+            Create Rule
+        </button>
+    </div>
+
+    <div style="background: #dbeafe; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid var(--secondary);">
+        <h3 style="font-size: 1.125rem; font-weight: 600; color: #0c4a6e; margin-bottom: 0.5rem;">
+            ℹ️ About Approval Rules
+        </h3>
+        <p style="color: #075985; margin-bottom: 0.75rem;">Configure flexible approval workflows with:</p>
+        <ul style="color: #075985; margin-left: 1.5rem; line-height: 1.8;">
+            <li><strong>Sequential Approvers:</strong> Define multi-level approval chain</li>
+            <li><strong>Percentage Rule:</strong> Auto-approve when X% of approvers approve</li>
+            <li><strong>Specific Approver:</strong> Auto-approve when a specific person approves</li>
+            <li><strong>Hybrid Rules:</strong> Combine both percentage AND/OR specific approver</li>
+        </ul>
+    </div>
+
+    {% if rules %}
+    <div class="stats-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <h3>{{ rules|length }}</h3>
+                <p>Active Rules</p>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; gap: 1.5rem;">
+        {% for rule in rules %}
+        <div style="background: var(--white); border: 2px solid var(--gray-lighter); border-radius: 12px; padding: 1.5rem; transition: all 0.3s; position: relative;" 
+             onmouseenter="this.style.borderColor='var(--primary)'; this.style.boxShadow='var(--shadow-lg)'" 
+             onmouseleave="this.style.borderColor='var(--gray-lighter)'; this.style.boxShadow='none'">
+            
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--dark); margin-bottom: 0.5rem;">
+                        {{ rule.name }}
+                    </h3>
+                    <span class="badge badge-success">Active</span>
+                </div>
+                <div style="background: rgba(99, 102, 241, 0.1); padding: 0.75rem; border-radius: 8px;">
+                    <svg fill="currentColor" viewBox="0 0 24 24" width="32" height="32" style="color: var(--primary);">
+                        <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div style="background: var(--gray-lighter); padding: 1.25rem; border-radius: 8px; display: grid; gap: 1rem;">
+                {% if rule.sequence_csv %}
+                <div>
+                    <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">
+                        📋 Sequential Approvers
+                    </strong>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        {% for uid in rule.sequence_csv.split(',') %}
+                        {% set approver = current_user.company.users|selectattr('id', 'equalto', uid|int)|first %}
+                        {% if approver %}
+                        <span class="badge badge-info">{{ loop.index }}. {{ approver.name }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if rule.min_percent_approve %}
+                <div>
+                    <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">
+                        📊 Percentage Rule
+                    </strong>
+                    <div style="background: white; padding: 0.75rem 1rem; border-radius: 6px; display: inline-block;">
+                        <strong style="color: var(--primary); font-size: 1.25rem;">{{ rule.min_percent_approve }}%</strong>
+                        <span style="color: var(--gray);"> approval required</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if rule.specific_approver_id %}
+                <div>
+                    <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">
+                        👤 Specific Approver
+                    </strong>
+                    <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">
+                        {{ rule.specific_approver.name }} (Auto-approve)
+                    </span>
+                </div>
+                {% endif %}
+
+                {% if rule.hybrid_any %}
+                <div>
+                    <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">
+                        🔀 Hybrid Mode
+                    </strong>
+                    <span class="badge badge-secondary">
+                        ANY condition satisfied (OR logic)
+                    </span>
+                </div>
+                {% elif rule.min_percent_approve and rule.specific_approver_id %}
+                <div>
+                    <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase; display: block; margin-bottom: 0.5rem;">
+                        🔀 Hybrid Mode
+                    </strong>
+                    <span class="badge badge-secondary">
+                        ALL conditions required (AND logic)
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-lighter); color: var(--gray); font-size: 0.875rem;">
+                <strong>Created:</strong> {{ rule.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+        </svg>
+        <h3>No Approval Rules</h3>
+        <p>Create your first approval workflow</p>
+        <button onclick="openRuleModal()" class="btn btn-primary" style="margin-top: 1rem;">Create Rule</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Rule Modal -->
+<div id="ruleModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; animation: fadeIn 0.3s; overflow-y: auto; padding: 2rem;">
+    <div style="background: white; border-radius: 16px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 0; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); margin: auto;">
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); padding: 2rem; border-radius: 16px 16px 0 0; color: white; position: sticky; top: 0; z-index: 1;">
+            <button onclick="closeRuleModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(255,255,255,0.2); border: none; font-size: 1.5rem; cursor: pointer; color: white; width: 40px; height: 40px; border-radius: 50%;">×</button>
+            <h2 style="margin: 0; font-size: 1.75rem;">Create Approval Rule</h2>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Define your workflow configuration</p>
+        </div>
+        
+        <form method="POST" action="{{ url_for('rules') }}" style="padding: 2rem;">
+            <div class="form-group">
+                <label class="form-label" for="name">Rule Name *</label>
+                <input type="text" id="name" name="name" class="form-control" placeholder="e.g., Standard Approval Flow" required>
+            </div>
+
+            <div style="background: var(--gray-lighter); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--dark);">
+                    📋 Sequential Approvers (Optional)
+                </h4>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="sequence_csv">Approver Sequence</label>
+                    <select id="approverSelect" class="form-control" style="margin-bottom: 0.75rem;">
+                        <option value="">Select an approver to add</option>
+                        {% for user in current_user.company.users %}
+                            {% if user.role in ['manager', 'admin'] %}
+                            <option value="{{ user.id }}">{{ user.name }} ({{ user.role|title }})</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="addApprover()" class="btn btn-secondary" style="width: 100%; margin-bottom: 1rem;">
+                        Add to Sequence
+                    </button>
+                    <input type="hidden" id="sequence_csv" name="sequence_csv">
+                    <div id="approverList" style="display: grid; gap: 0.5rem;"></div>
+                </div>
+            </div>
+
+            <div style="background: var(--gray-lighter); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--dark);">
+                    📊 Conditional Rules (Optional)
+                </h4>
+                
+                <div class="form-group">
+                    <label class="form-label" for="min_percent_approve">Minimum Approval Percentage</label>
+                    <input type="number" id="min_percent_approve" name="min_percent_approve" class="form-control" min="1" max="100" placeholder="e.g., 60">
+                    <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                        Leave empty to disable percentage rule
+                    </small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="specific_approver_id">Specific Approver (Auto-approve)</label>
+                    <select id="specific_approver_id" name="specific_approver_id" class="form-control">
+                        <option value="">None</option>
+                        {% for user in current_user.company.users %}
+                            {% if user.role in ['manager', 'admin'] %}
+                            <option value="{{ user.id }}">{{ user.name }} ({{ user.role|title }})</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                        If this person approves, expense is auto-approved
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="hybrid_any" name="hybrid_any">
+                    <label for="hybrid_any">
+                        <strong>Use OR logic</strong> (approve if ANY condition is met instead of ALL)
+                    </label>
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary">
+                    <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                    </svg>
+                    Create Rule
+                </button>
+                <button type="button" onclick="closeRuleModal()" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    .approver-item {
+        background: white;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid var(--gray-light);
+    }
+    
+    .approver-item:hover {
+        border-color: var(--primary);
+    }
+</style>
+
+<script>
+    let approverSequence = [];
+
+    function openRuleModal() {
+        approverSequence = [];
+        document.getElementById('approverList').innerHTML = '';
+        document.getElementById('sequence_csv').value = '';
+        document.getElementById('ruleModal').style.display = 'flex';
+    }
+
+    function closeRuleModal() {
+        document.getElementById('ruleModal').style.display = 'none';
+    }
+
+    function addApprover() {
+        const select = document.getElementById('approverSelect');
+        const userId = select.value;
+        const userName = select.options[select.selectedIndex].text;
+        
+        if (!userId || approverSequence.includes(userId)) {
+            if (!userId) alert('Please select an approver');
+            else alert('This approver is already in the sequence');
+            return;
+        }
+        
+        approverSequence.push(userId);
+        updateApproverList();
+        select.value = '';
+    }
+
+    function removeApprover(index) {
+        approverSequence.splice(index, 1);
+        updateApproverList();
+    }
+
+    function moveUp(index) {
+        if (index > 0) {
+            [approverSequence[index], approverSequence[index - 1]] = [approverSequence[index - 1], approverSequence[index]];
+            updateApproverList();
+        }
+    }
+
+    function moveDown(index) {
+        if (index < approverSequence.length - 1) {
+            [approverSequence[index], approverSequence[index + 1]] = [approverSequence[index + 1], approverSequence[index]];
+            updateApproverList();
+        }
+    }
+
+    function updateApproverList() {
+        const listDiv = document.getElementById('approverList');
+        const select = document.getElementById('approverSelect');
+        
+        if (approverSequence.length === 0) {
+            listDiv.innerHTML = '<p style="color: var(--gray); text-align: center; padding: 1rem;">No approvers added yet</p>';
+            document.getElementById('sequence_csv').value = '';
+            return;
+        }
+        
+        listDiv.innerHTML = approverSequence.map((userId, index) => {
+            const option = Array.from(select.options).find(opt => opt.value === userId);
+            const userName = option ? option.text : 'Unknown';
+            
+            return `
+                <div class="approver-item">
+                    <div>
+                        <strong style="color: var(--primary); margin-right: 0.5rem;">${index + 1}.</strong>
+                        <span>${userName}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        ${index > 0 ? `<button type="button" onclick="moveUp(${index})" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">↑</button>` : ''}
+                        ${index < approverSequence.length - 1 ? `<button type="button" onclick="moveDown(${index})" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">↓</button>` : ''}
+                        <button type="button" onclick="removeApprover(${index})" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">×</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        document.getElementById('sequence_csv').value = approverSequence.join(',');
+    }
+
+    // Close modal on outside click
+    document.getElementById('ruleModal').addEventListener('click', function(e) {
+        if (e.target === this) closeRuleModal();
+    });
+
+    // ESC key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('ruleModal').style.display === 'flex') {
+            closeRuleModal();
+        }
+    });
+</script>
+{% endblock %}
