@@ -333,3 +333,63 @@ def logout():
 def dashboard():
     return render_template("dashboard.html")
 
+# -----------------------------
+# Admin Routes
+# -----------------------------
+@app.route("/admin/users", methods=["GET","POST"])
+@login_required
+@require_roles("admin")
+def admin_users():
+    if request.method == "POST":
+        try:
+            # Check if email already exists
+            existing_user = User.query.filter_by(email=request.form["email"].lower().strip()).first()
+            if existing_user:
+                flash("Email already exists")
+                return redirect(url_for("admin_users"))
+            
+            u = User(
+                company_id=current_user.company_id,
+                name=request.form["name"].strip(),
+                email=request.form["email"].lower().strip(),
+                role=request.form["role"],
+                manager_id=int(request.form["manager_id"]) if request.form.get("manager_id") else None,
+                is_manager_approver=bool(request.form.get("is_manager_approver"))
+            )
+            u.set_password(request.form["password"])
+            db.session.add(u)
+            db.session.commit()
+            flash("User created successfully")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error creating user: {str(e)}")
+        return redirect(url_for("admin_users"))
+    
+    users = User.query.filter_by(company_id=current_user.company_id).order_by(User.name).all()
+    return render_template("users.html", users=users)
+
+@app.route("/admin/rules", methods=["GET","POST"])
+@login_required
+@require_roles("admin")
+def rules():
+    if request.method == "POST":
+        try:
+            r = ApprovalRule(
+                company_id=current_user.company_id,
+                name=request.form["name"].strip(),
+                sequence_csv=request.form.get("sequence_csv") or None,
+                min_percent_approve=int(request.form["min_percent_approve"]) if request.form.get("min_percent_approve") else None,
+                specific_approver_id=int(request.form["specific_approver_id"]) if request.form.get("specific_approver_id") else None,
+                hybrid_any=bool(request.form.get("hybrid_any"))
+            )
+            db.session.add(r)
+            db.session.commit()
+            flash("Rule created successfully")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error creating rule: {str(e)}")
+        return redirect(url_for("rules"))
+    
+    rules = ApprovalRule.query.filter_by(company_id=current_user.company_id, active=True).order_by(ApprovalRule.name).all()
+    return render_template("rules.html", rules=rules)
+
