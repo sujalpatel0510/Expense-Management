@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}New Expense - Expense Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">Submit New Expense</h1>
+        <a href="{{ url_for('my_expenses') }}" class="btn btn-secondary">Back to My Expenses</a>
+    </div>
+
+    <div style="background: #dbeafe; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #0ea5e9;">
+        <h3 style="font-size: 1.125rem; font-weight: 600; color: #0c4a6e; margin-bottom: 0.5rem;">
+            📸 Quick OCR Upload
+        </h3>
+        <p style="color: #075985; margin-bottom: 1rem;">Upload a receipt image to auto-fill expense details</p>
+        <button type="button" onclick="simulateOCR()" class="btn btn-primary">
+            <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+            </svg>
+            Scan Receipt with OCR
+        </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('new_expense') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="category">Category *</label>
+                <select id="category" name="category" class="form-control" required>
+                    <option value="">Select Category</option>
+                    <option value="Travel">🚗 Travel</option>
+                    <option value="Food">🍽️ Food & Dining</option>
+                    <option value="Accommodation">🏨 Accommodation</option>
+                    <option value="Office Supplies">📦 Office Supplies</option>
+                    <option value="Software">💻 Software</option>
+                    <option value="Training">📚 Training</option>
+                    <option value="Equipment">🔧 Equipment</option>
+                    <option value="Entertainment">🎉 Entertainment</option>
+                    <option value="Other">📋 Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="expense_date">Expense Date *</label>
+                <input type="date" id="expense_date" name="expense_date" class="form-control" required max="{{ '%Y-%m-%d'|strftime }}">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="amount">Amount *</label>
+                <input type="number" id="amount" name="amount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="currency">Currency *</label>
+                <select id="currency" name="currency" class="form-control" required>
+                    <option value="{{ current_user.company.currency }}" selected>{{ current_user.company.currency }} (Company Default)</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - British Pound</option>
+                    <option value="INR">INR - Indian Rupee</option>
+                    <option value="CAD">CAD - Canadian Dollar</option>
+                    <option value="AUD">AUD - Australian Dollar</option>
+                    <option value="JPY">JPY - Japanese Yen</option>
+                    <option value="CNY">CNY - Chinese Yuan</option>
+                    <option value="SGD">SGD - Singapore Dollar</option>
+                    <option value="AED">AED - UAE Dirham</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" name="description" class="form-control" rows="4" placeholder="Add details about this expense..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="rule_id">Approval Workflow</label>
+            <select id="rule_id" name="rule_id" class="form-control">
+                <option value="">Default (Manager Approval)</option>
+                {% for rule in rules %}
+                <option value="{{ rule.id }}">{{ rule.name }}</option>
+                {% endfor %}
+            </select>
+            <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                Select a custom approval workflow or use default manager approval
+            </small>
+        </div>
+
+        <div style="background: var(--gray-lighter); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--dark);">Expense Summary</h4>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem;">
+                <strong>Category:</strong> <span id="summary-category">—</span>
+                <strong>Amount:</strong> <span id="summary-amount">—</span>
+                <strong>Date:</strong> <span id="summary-date">—</span>
+                <strong>Workflow:</strong> <span id="summary-workflow">Manager Approval</span>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button type="submit" class="btn btn-primary">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+                Submit Expense
+            </button>
+            <a href="{{ url_for('my_expenses') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Set today's date as default
+    document.getElementById('expense_date').valueAsDate = new Date();
+
+    // Real-time summary update
+    function updateSummary() {
+        const category = document.getElementById('category').value || '—';
+        const amount = document.getElementById('amount').value;
+        const currency = document.getElementById('currency').value;
+        const date = document.getElementById('expense_date').value;
+        const ruleSelect = document.getElementById('rule_id');
+        const workflow = ruleSelect.options[ruleSelect.selectedIndex].text;
+
+        document.getElementById('summary-category').textContent = category;
+        document.getElementById('summary-amount').textContent = amount ? `${currency} ${parseFloat(amount).toFixed(2)}` : '—';
+        document.getElementById('summary-date').textContent = date || '—';
+        document.getElementById('summary-workflow').textContent = workflow;
+    }
+
+    document.getElementById('category').addEventListener('change', updateSummary);
+    document.getElementById('amount').addEventListener('input', updateSummary);
+    document.getElementById('currency').addEventListener('change', updateSummary);
+    document.getElementById('expense_date').addEventListener('change', updateSummary);
+    document.getElementById('rule_id').addEventListener('change', updateSummary);
+
+    // Simulate OCR functionality
+    function simulateOCR() {
+        const btn = event.target;
+        btn.textContent = 'Processing...';
+        btn.disabled = true;
+
+        fetch('/ocr/parse', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('category').value = data.category || '';
+                document.getElementById('description').value = data.description || '';
+                document.getElementById('expense_date').value = data.expense_date || '';
+                document.getElementById('amount').value = data.amount || '';
+                document.getElementById('currency').value = data.currency || '{{ current_user.company.currency }}';
+                updateSummary();
+                
+                // Show success message
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success';
+                alert.innerHTML = '<span>✓ Receipt scanned successfully! Please review the auto-filled details.</span>';
+                document.querySelector('.card').insertBefore(alert, document.querySelector('form'));
+                
+                setTimeout(() => alert.remove(), 5000);
+            })
+            .catch(error => {
+                alert('OCR processing failed. Please enter details manually.');
+            })
+            .finally(() => {
+                btn.innerHTML = '<svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Scan Receipt with OCR';
+                btn.disabled = false;
+            });
+    }
+</script>
+{% endblock %}
