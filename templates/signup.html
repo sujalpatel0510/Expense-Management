@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - Expense Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+    }
+
+    .auth-container {
+        width: 100%;
+        max-width: 500px;
+        padding: 0 1rem;
+    }
+
+    .auth-card {
+        background: var(--white);
+        border-radius: 16px;
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        padding: 3rem;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .auth-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--white);
+        font-size: 2.5rem;
+    }
+
+    .auth-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .auth-subtitle {
+        color: var(--gray);
+        font-size: 1rem;
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--gray-lighter);
+        color: var(--gray);
+    }
+
+    .auth-footer a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .navbar {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="48" height="48">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Setup your company and admin account</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('signup') }}">
+            <div class="form-group">
+                <label class="form-label" for="name">Full Name</label>
+                <input type="text" id="name" name="name" class="form-control" placeholder="John Doe" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="john@company.com" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required minlength="6">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="company">Company Name</label>
+                <input type="text" id="company" name="company" class="form-control" placeholder="Acme Corporation" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="country">Country</label>
+                <select id="country" name="country" class="form-control" required>
+                    <option value="">Select Country</option>
+                    <option value="United States">United States (USD)</option>
+                    <option value="India">India (INR)</option>
+                    <option value="United Kingdom">United Kingdom (GBP)</option>
+                    <option value="Germany">Germany (EUR)</option>
+                    <option value="Canada">Canada (CAD)</option>
+                    <option value="Australia">Australia (AUD)</option>
+                    <option value="Japan">Japan (JPY)</option>
+                    <option value="China">China (CNY)</option>
+                    <option value="Brazil">Brazil (BRL)</option>
+                    <option value="France">France (EUR)</option>
+                    <option value="Singapore">Singapore (SGD)</option>
+                    <option value="United Arab Emirates">United Arab Emirates (AED)</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                Create Account
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Already have an account? <a href="{{ url_for('login') }}">Sign In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
