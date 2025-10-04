@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Approvals - Expense Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">Pending Approvals</h1>
+        <div class="badge badge-warning" style="font-size: 1.25rem; padding: 0.75rem 1.5rem;">
+            {{ rows|length }} Pending
+        </div>
+    </div>
+
+    {% if rows %}
+    <div style="background: #fef3c7; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid var(--warning);">
+        <h3 style="font-size: 1.125rem; font-weight: 600; color: #92400e; margin-bottom: 0.5rem;">
+            ⚠️ Approval Notice
+        </h3>
+        <p style="color: #78350f;">You have {{ rows|length }} expense(s) waiting for your approval. All amounts are displayed in company currency ({{ company_ccy }}).</p>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Amount ({{ company_ccy }})</th>
+                    <th>Date</th>
+                    <th>Submitted</th>
+                    <th>Your Step</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <strong>{{ row.e.submitter.name }}</strong>
+                        <br>
+                        <small style="color: var(--gray);">{{ row.e.submitter.email }}</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600;">{{ row.e.category }}</span>
+                    </td>
+                    <td>{{ row.e.description[:60] }}{% if row.e.description and row.e.description|length > 60 %}...{% endif %}</td>
+                    <td>
+                        <strong style="font-size: 1.125rem; color: var(--primary);">
+                            {{ company_ccy }} {{ "%.2f"|format(row.e.amount_company_ccy) }}
+                        </strong>
+                        {% if row.e.currency != company_ccy %}
+                        <br><small style="color: var(--gray);">({{ row.e.currency }} {{ "%.2f"|format(row.e.amount) }})</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ row.e.expense_date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <small style="color: var(--gray);">{{ row.e.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </td>
+                    <td>
+                        <span class="badge badge-info">Step {{ row.step.sequence }}</span>
+                    </td>
+                    <td>
+                        <button onclick="openApprovalModal({{ row.step.id }}, '{{ row.e.submitter.name }}', '{{ row.e.category }}', '{{ company_ccy }} {{ "%.2f"|format(row.e.amount_company_ccy) }}', '{{ row.e.description|replace("'", "\\'") }}')" 
+                                class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                            Review
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+        </svg>
+        <h3>All Caught Up!</h3>
+        <p>No pending approvals at this time</p>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary" style="margin-top: 1rem;">Back to Dashboard</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Approval Modal -->
+<div id="approvalModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; animation: fadeIn 0.3s;">
+    <div style="background: white; border-radius: 16px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 0; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); padding: 2rem; border-radius: 16px 16px 0 0; color: white;">
+            <button onclick="closeApprovalModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(255,255,255,0.2); border: none; font-size: 1.5rem; cursor: pointer; color: white; width: 40px; height: 40px; border-radius: 50%; transition: background 0.3s;">×</button>
+            <h2 style="margin: 0; font-size: 1.75rem;">Review Expense</h2>
+        </div>
+        
+        <div style="padding: 2rem;">
+            <div id="approvalContent" style="display: grid; gap: 1.5rem; margin-bottom: 2rem;"></div>
+            
+            <form id="approvalForm" method="POST" style="display: grid; gap: 1.5rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="comment">Comments</label>
+                    <textarea id="comment" name="comment" class="form-control" rows="4" placeholder="Add your comments here..."></textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <button type="button" onclick="submitDecision('approved')" class="btn btn-success" style="width: 100%;">
+                        <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                        </svg>
+                        Approve
+                    </button>
+                    <button type="button" onclick="submitDecision('rejected')" class="btn btn-danger" style="width: 100%;">
+                        <svg fill="currentColor" viewBox="0 0 24 24" width="20" height="20" style="vertical-align: middle; margin-right: 0.5rem;">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                        Reject
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    #approvalModal button:hover {
+        background: rgba(255,255,255,0.3) !important;
+    }
+</style>
+
+<script>
+    let currentStepId = null;
+
+    function openApprovalModal(stepId, employee, category, amount, description) {
+        currentStepId = stepId;
+        
+        const content = `
+            <div style="background: var(--gray-lighter); padding: 1.5rem; border-radius: 8px;">
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase;">Employee</strong>
+                        <div style="font-size: 1.125rem; margin-top: 0.25rem; font-weight: 600;">${employee}</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase;">Category</strong>
+                            <div style="margin-top: 0.25rem;">${category}</div>
+                        </div>
+                        <div>
+                            <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase;">Amount</strong>
+                            <div style="margin-top: 0.25rem; font-size: 1.25rem; font-weight: 700; color: var(--primary);">${amount}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <strong style="color: var(--gray); font-size: 0.875rem; text-transform: uppercase;">Description</strong>
+                        <div style="margin-top: 0.25rem;">${description || 'No description provided'}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('approvalContent').innerHTML = content;
+        document.getElementById('approvalModal').style.display = 'flex';
+        document.getElementById('comment').value = '';
+    }
+
+    function closeApprovalModal() {
+        document.getElementById('approvalModal').style.display = 'none';
+        currentStepId = null;
+    }
+
+    function submitDecision(decision) {
+        if (!currentStepId) return;
+        
+        const comment = document.getElementById('comment').value;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/approvals/decide/${currentStepId}`;
+        
+        const decisionInput = document.createElement('input');
+        decisionInput.type = 'hidden';
+        decisionInput.name = 'decision';
+        decisionInput.value = decision;
+        
+        const commentInput = document.createElement('input');
+        commentInput.type = 'hidden';
+        commentInput.name = 'comment';
+        commentInput.value = comment;
+        
+        form.appendChild(decisionInput);
+        form.appendChild(commentInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // Close modal on outside click
+    document.getElementById('approvalModal').addEventListener('click', function(e) {
+        if (e.target === this) closeApprovalModal();
+    });
+
+    // ESC key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('approvalModal').style.display === 'flex') {
+            closeApprovalModal();
+        }
+    });
+</script>
+{% endblock %}

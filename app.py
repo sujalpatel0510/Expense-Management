@@ -16,7 +16,10 @@ from passlib.hash import bcrypt
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "dev_secret_change_in_production")
 # PostgreSQL connection string
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "postgresql://exp_user:strongpass@localhost:5432/expenses")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://sujal:password@localhost:5432/expense_db"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     'pool_pre_ping': True,
@@ -393,3 +396,211 @@ def rules():
     rules = ApprovalRule.query.filter_by(company_id=current_user.company_id, active=True).order_by(ApprovalRule.name).all()
     return render_template("rules.html", rules=rules)
 
+
+# -----------------------------
+# Employee Routes
+# -----------------------------
+@app.route("/expenses/new", methods=["GET","POST"])
+@login_required
+@require_roles("employee")
+def new_expense():
+    rules = ApprovalRule.query.filter_by(company_id=current_user.company_id, active=True).order_by(ApprovalRule.name).all()
+    
+    if request.method == "POST":
+        try:
+            category = request.form["category"]
+            description = request.form.get("description")
+            expense_date = datetime.fromisoformat(request.form["expense_date"]).date()
+            amount = Decimal(request.form["amount"])
+            currency = request.form["currency"].upper()
+            rule_id = int(request.form["rule_id"]) if request.form.get("rule_id") else None
+
+            # Currency normalization
+            company_ccy = current_user.company.currency
+            if currency == company_ccy:
+                norm = quant2(amount)
+            else:
+                rate = get_rate(currency, company_ccy)
+                norm = quant2(amount * rate)
+
+            e = Expense(
+                company_id=current_user.company_id,
+                submitter_id=current_user.id,
+                category=category, 
+                description=description,
+                expense_date=expense_date,
+                amount=quant2(amount), 
+                currency=currency,
+                amount_company_ccy=norm,
+                status="pending",
+                rule_id=rule_id
+            )
+            db.session.add(e)
+            db.session.flush()
+
+            # Build approval workflow
+            if rule_id:
+                rule = db.session.get(ApprovalRule, rule_id)
+                build_steps_for_rule(e, rule)
+            else:
+                # Default manager approval if exists
+                if current_user.manager_id and current_user.is_manager_approver:
+                    st = ApprovalStep(expense_id=e.id, approver_id=current_user.manager_id, sequence=1)
+                    db.session.add(st)
+
+            db.session.commit()
+            flash("Expense submitted successfully")
+            return redirect(url_for("my_expenses"))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error submitting expense: {str(e)}")
+    
+    return render_template("new_expense.html", rules=rules)
+
+@app.route("/expenses/mine")
+@login_required
+@require_roles("employee")
+def my_expenses():
+    exps = (Expense.query
+           .filter_by(submitter_id=current_user.id)
+           .order_by(Expense.created_at.desc())
+           .all())
+    return render_template("my_expenses.html", expenses=exps)
+
+# -----------------------------
+# Manager/Admin Routes
+# -----------------------------
+@app.route("/approvals")
+@login_required
+@require_roles("manager","admin")
+def approvals():
+    # Get steps awaiting current user's approval
+    steps = (ApprovalStep.query
+             .join(Expense, ApprovalStep.expense_id == Expense.id)
+             .filter(ApprovalStep.approver_id == current_user.id,
+                     Expense.company_id == current_user.company_id,
+                     ApprovalStep.decision.is_(None),
+                     Expense.status == "pending")
+             .order_by(Expense.created_at.desc(), ApprovalStep.sequence.asc())
+             .all())
+    
+    rows = []
+    for s in steps:
+        # Only show if this is the current pending step
+        first_pending = current_pending_step(s.expense)
+        if first_pending and first_pending.id == s.id:
+            rows.append({"e": s.expense, "step": s})
+    
+    company_ccy = current_user.company.currency
+    return render_template("approvals.html", rows=rows, company_ccy=company_ccy)
+
+@app.route("/approvals/decide/<int:step_id>", methods=["POST"])
+@login_required
+@require_roles("manager","admin")
+def decide(step_id):
+    try:
+        step = db.session.get(ApprovalStep, step_id)
+        if not step or step.approver_id != current_user.id:
+            abort(404)
+        
+        expense = step.expense
+        if expense.status != "pending":
+            flash("Expense is no longer pending")
+            return redirect(url_for("approvals"))
+        
+        # Ensure this is the current pending step
+        if current_pending_step(expense).id != step.id:
+            flash("Not your turn to approve")
+            return redirect(url_for("approvals"))
+        
+        decision = request.form["decision"]
+        comment = request.form.get("comment")
+        
+        step.decision = decision
+        step.comment = comment
+        step.decided_at = datetime.utcnow()
+        db.session.flush()
+        
+        if decision == "rejected":
+            expense.status = "rejected"
+            db.session.commit()
+            flash("Expense rejected")
+            return redirect(url_for("approvals"))
+        
+        # Check conditional approval rules
+        rule = expense.rule
+        cond_result = evaluate_conditional(rule, expense) if rule else None
+        next_pending = current_pending_step(expense)
+        
+        if next_pending and not (cond_result is True):
+            db.session.commit()
+            flash("Approved - forwarded to next approver")
+            return redirect(url_for("approvals"))
+        
+        # Final approval
+        if not next_pending or cond_result is True:
+            expense.status = "approved"
+            expense.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        flash("Expense fully approved")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error processing decision: {str(e)}")
+    
+    return redirect(url_for("approvals"))
+
+# -----------------------------
+# Utility Routes
+# -----------------------------
+@app.route("/ocr/parse", methods=["POST"])
+@login_required
+def ocr_parse():
+    # OCR stub for future implementation
+    return jsonify({
+        "category": "Restaurant",
+        "description": "Auto-parsed from receipt OCR",
+        "expense_date": datetime.utcnow().date().isoformat(),
+        "amount": "23.50",
+        "currency": current_user.company.currency
+    })
+
+@app.route("/debug/seed")
+@login_required
+@require_roles("admin")
+def seed():
+    """Create sample users for testing"""
+    try:
+        m = User(
+            company_id=current_user.company_id, 
+            email=f"mgr+{uuid4().hex[:6]}@example.com", 
+            name="Manager One", 
+            role="manager"
+        )
+        m.set_password("password123")
+        
+        e = User(
+            company_id=current_user.company_id, 
+            email=f"emp+{uuid4().hex[:6]}@example.com", 
+            name="Employee One", 
+            role="employee", 
+            manager=m, 
+            is_manager_approver=True
+        )
+        e.set_password("password123")
+        
+        db.session.add_all([m, e])
+        db.session.commit()
+        
+        flash(f"Created Manager: {m.email} and Employee: {e.email} (password: password123)")
+        
+    except Exception as ex:
+        db.session.rollback()
+        flash(f"Error seeding data: {str(ex)}")
+    
+    return redirect(url_for("admin_users"))
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
